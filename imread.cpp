@@ -1,26 +1,29 @@
 #include <cstdio>
-#include <opencv2/highgui.hpp>
-#include <opencv2/imgcodecs.hpp>
+#include <opencv2/opencv.hpp>
+
+#include "mytools.hpp"
+#include "vector"
 
 int main(int argc, char *argv[]) {
   if (argc < 2) {
-    printf("Erro");
+    printf("An input image file is missing.\n");
     return EXIT_FAILURE;
   }
   cv::Mat image;
-  image = cv::imread(argv[1]);
+  image = cv::imread(argv[1], cv::ImreadModes::IMREAD_COLOR);
   if (image.empty()) {
     printf("Image file is not found.\n");
     return EXIT_FAILURE;
   }
-  printf("wdth = %d, hight = %d", image.cols, image.rows);
-  for (int y = 0; image.rows; ++y) {
-    for (int x = 0; image.cols; ++x) {
-      int val = image.data[y * image.cols + x];
-      val /= 2;
-      image.data[y * image.cols + x] = val;
-    }
-  }
+  rgb2ycbcr(image);
+  cv::Mat ycrcb<cv::Mat> ycrcb;
+  cv::split(image, ycrcb);
+
+  mozaic(ycrcb);
+
+  cv::marge(ycrcb, image);
+
+  cv::cvtColor[image, image, cv::COLOR_YCbCR2BGR];
   cv::imshow("image", image);
   cv::waitKey();
   cv::destroyAllWindows();

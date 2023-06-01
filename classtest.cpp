@@ -1,5 +1,5 @@
 #include <iostream>
-#include <math>
+
 class complex {  // sample class for
  private:
   double real;  // 　real part
@@ -13,8 +13,8 @@ class complex {  // sample class for
 
 int main() {
   // C++のクラスインスタンス
-  complex *a;
-  complex b[5, -7];
-  a = &b;
-  std::cout << "" << b.abs() << std::endl;
+  // complex *a;
+  // complex b[5, -7];
+  // a = &b;
+  // std::cout << "" << b.abs() << std::endl;
 }
