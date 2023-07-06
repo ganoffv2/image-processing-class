@@ -16,10 +16,20 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
   rgb2ycbcr(image);
-  cv::Mat ycrcb<cv::Mat> ycrcb;
+  std::vector<cv::Mat> ycrcb;
   cv::split(image, ycrcb);
 
-  mozaic(ycrcb);
+  for (int c = 0; c < image.channels(); ++c) {
+    cv::Mat buf;
+    ycrcb[c].convertTo(buf, CV_32F);
+
+    blkproc(buf, blk::dct2);
+    blkproc(buf, blk::quantize);
+    blkproc(buf, blk::deuantize);
+    blkproc(buf, blk::idct2);
+
+    buf.converTo(ycrcb[c], ycrcb[c].type())
+  }
 
   cv::marge(ycrcb, image);
 
