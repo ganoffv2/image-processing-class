@@ -1,8 +1,10 @@
 #include <cstdio>
-#include <opencv2/opencv.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
+#include <vector>
 
 #include "mytools.hpp"
-#include "vector"
 
 int main(int argc, char *argv[]) {
   if (argc < 2) {
@@ -10,30 +12,77 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
   cv::Mat image;
-  image = cv::imread(argv[1], cv::ImreadModes::IMREAD_COLOR);
+  image = cv::imread(argv[1], cv::ImreadModes::IMREAD_ANYCOLOR);
   if (image.empty()) {
     printf("Image file is not found.\n");
     return EXIT_FAILURE;
   }
-  rgb2ycbcr(image);
-  std::vector<cv::Mat> ycrcb;
-  cv::split(image, ycrcb);
-
-  for (int c = 0; c < image.channels(); ++c) {
-    cv::Mat buf;
-    ycrcb[c].convertTo(buf, CV_32F);
-
-    blkproc(buf, blk::dct2);
-    blkproc(buf, blk::quantize);
-    blkproc(buf, blk::deuantize);
-    blkproc(buf, blk::idct2);
-
-    buf.converTo(ycrcb[c], ycrcb[c].type())
+  cv::Mat original = image.clone();
+  if (argc < 3) {
+    printf("Qfactor is missing.\n");
+    return EXIT_FAILURE;
+  }
+  int QF = strtol(argv[2], nullptr, 10);
+  if (QF < 0 || QF > 100) {
+    printf("Valid range for Qfactor is from 0 to 100.\n");
+    return EXIT_FAILURE;
+  }
+  QF = (QF == 0) ? 1 : QF;
+  float scale;
+  if (QF < 50) {
+    scale = 5000.0 / QF;
+  } else {
+    scale = 200 - QF * 2;
   }
 
-  cv::marge(ycrcb, image);
+  int qtable_L[64], qtable_C[64];
+  create_qtable(0, scale, qtable_L);
+  create_qtable(1, scale, qtable_C);
 
-  cv::cvtColor[image, image, cv::COLOR_YCbCR2BGR];
+  bitstream enc;
+  if (image.channels() == 3) bgr2ycrcb(image);
+  std::vector<cv::Mat> ycrcb;
+  std::vector<cv::Mat> buf(image.channels());
+  cv::split(image, ycrcb);
+
+  constexpr float D = 2;
+  // encoder
+  for (int c = 0; c < image.channels(); ++c) {
+    int *qtable = qtable_L;
+    if (c > 0) {
+      qtable = qtable_C;
+      cv::resize(ycrcb[c], ycrcb[c], cv::Size(), 1 / D, 1 / D,
+                 cv::INTER_LINEAR_EXACT);
+    }
+    ycrcb[c].convertTo(buf[c], CV_32F);
+    buf[c] -= 128.0;  // DC level shift
+    blkproc(buf[c], blk::dct2);
+    blkproc(buf[c], blk::quantize, qtable);
+  }
+  Encode_MCUs(buf, enc);
+  const std::vector<uint8_t> codestream = enc.finalize();
+  printf("codestream size = %lld\n", codestream.size());
+  // decoder
+  for (int c = 0; c < image.channels(); ++c) {
+    int *qtable = qtable_L;
+    if (c > 0) {
+      qtable = qtable_C;
+    }
+    blkproc(buf[c], blk::dequantize, qtable);
+    blkproc(buf[c], blk::idct2);
+    buf[c] += 128.0;  // inverse DC level shift
+    buf[c].convertTo(ycrcb[c], ycrcb[c].type());
+    if (c > 0) {
+      cv::resize(ycrcb[c], ycrcb[c], cv::Size(), D, D, cv::INTER_LINEAR_EXACT);
+    }
+  }
+
+  cv::merge(ycrcb, image);
+
+  if (image.channels() == 3) cv::cvtColor(image, image, cv::COLOR_YCrCb2BGR);
+
+  myPSNR(original, image);
+
   cv::imshow("image", image);
   cv::waitKey();
   cv::destroyAllWindows();
