@@ -6,6 +6,7 @@
 
 #include "bitstream.hpp"
 #include "huffman_tables.hpp"
+#include "ycctype.hpp"
 #include "zigzag_order.hpp"
 
 void bgr2ycrcb(cv::Mat &image) {
@@ -142,12 +143,22 @@ void EncodeBlock(cv::Mat &in, int c, int &prev_dc, bitstream &enc) {
   }
 }
 
-void Encode_MCUs(std::vector<cv::Mat> &buf, bitstream &enc) {
+void Encode_MCUs(std::vector<cv::Mat> &buf, bitstream &enc, int YCCtype) {
   const int nc = buf.size();
   const int height = buf[0].rows;
   const int width = buf[0].cols;
-  const int H = 2;
-  const int V = 2;
+  int H, V;
+  switch (YCCtype) {
+    case YCC::YUV420:
+      H = V = 2;
+      break;
+    case YCC::GRAY:
+      H = V = 1;
+      break;
+    default:
+      H = V = 0;
+      break;
+  }
   cv::Mat blk;
   int prev_dc[3] = {0};
   for (int Ly = 0, Cy = 0; Ly < height; Ly += BSIZE * V, Cy += BSIZE) {

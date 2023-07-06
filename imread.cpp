@@ -4,7 +4,9 @@
 #include <opencv2/imgproc.hpp>
 #include <vector>
 
+#include "jpgheaders.hpp"
 #include "mytools.hpp"
+#include "ycctype.hpp"
 
 int main(int argc, char *argv[]) {
   if (argc < 2) {
@@ -40,6 +42,10 @@ int main(int argc, char *argv[]) {
   create_qtable(1, scale, qtable_C);
 
   bitstream enc;
+  int YCCtype = (image.channels() == 3) ? YCC::YUV420 : YCC::GRAY;
+  create_mainheader(image.cols, image.rows, image.channels(), qtable_L,
+                    qtable_C, YCC::YUV420, enc);
+
   if (image.channels() == 3) bgr2ycrcb(image);
   std::vector<cv::Mat> ycrcb;
   std::vector<cv::Mat> buf(image.channels());
@@ -62,6 +68,10 @@ int main(int argc, char *argv[]) {
   Encode_MCUs(buf, enc);
   const std::vector<uint8_t> codestream = enc.finalize();
   printf("codestream size = %lld\n", codestream.size());
+
+  FILE *fout = fopen("myjpg.jpg", "wb");
+  fwrite(codestream.data(), sizeof(unsigned char), codestream.size(), fout);
+  fclose(fout);
   // decoder
   for (int c = 0; c < image.channels(); ++c) {
     int *qtable = qtable_L;
