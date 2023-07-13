@@ -47,8 +47,8 @@ int main(int argc, char *argv[]) {
   create_mainheader(image.cols, image.rows, image.channels(), qtable_L,
                     qtable_C, YCC::YUV420, enc);
 
-  auto start = std::chrono::high_resolution_clock::now();
-  long long duration = 0;
+  // auto start = std::chrono::high_resolution_clock::now();
+  long long duration = 0, DCTtime = 0, Qtime = 0, Entropytime = 0;
   if (image.channels() == 3) bgr2ycrcb(image);
   std::vector<cv::Mat> ycrcb;
   std::vector<cv::Mat> buf(image.channels());
@@ -65,15 +65,43 @@ int main(int argc, char *argv[]) {
     }
     ycrcb[c].convertTo(buf[c], CV_32F);
     buf[c] -= 128.0;  // DC level shift
+    // DCT の計測はじめ
+    auto DCTstart = std::chrono::high_resolution_clock::now();
     blkproc(buf[c], blk::dct2);
+    // DCT　の計測終わり
+    auto DCTstop = std::chrono::high_resolution_clock::now();
+
+    DCTtime += std::chrono::duration_cast<std::chrono::microseconds>(DCTstop -
+                                                                     DCTstart)
+                   .count();
+
+    // 量子化計測はじめ
+    auto Qstart = std::chrono::high_resolution_clock::now();
     blkproc(buf[c], blk::quantize, qtable);
+    // 量子化計測終わり
+    auto Qstop = std::chrono::high_resolution_clock::now();
+
+    Qtime +=
+        std::chrono::duration_cast<std::chrono::microseconds>(Qstop - Qstart)
+            .count();
   }
+  auto Entoropystart = std::chrono::high_resolution_clock::now();
   Encode_MCUs(buf, enc, YCCtype);
-  auto stop = std::chrono::high_resolution_clock::now();
-  duration +=
-      std::chrono::duration_cast<std::chrono::microseconds>(stop - start)
-          .count();
-  printf("Elapsed Time: %f [ms]\n", duration / 1000.0);
+  auto Entropystop = std::chrono::high_resolution_clock::now();
+
+  Entropytime += std::chrono::duration_cast<std::chrono::microseconds>(
+                     Entropystop - Entoropystart)
+                     .count();
+
+  // auto stop = std::chrono::high_resolution_clock::now();
+
+  // duration +=
+  //  std::chrono::duration_cast<std::chrono::microseconds>(stop - start)
+  //  .count();
+  // printf("Elapsed Time: %f [ms]\n", duration / 1000.0);
+  printf("DCT Time: %f [ms]\n", DCTtime / 1000.0);
+  printf("Quantize Time: %f [ms]\n", Qtime / 1000.0);
+  printf("Entropyuantize Time: %f [ms]\n", Entropytime / 1000.0);
   const std::vector<uint8_t> codestream = enc.finalize();
   printf("codestream size = %lld\n", codestream.size());
 
@@ -101,7 +129,7 @@ int main(int argc, char *argv[]) {
 
   myPSNR(original, image);
 
-  cv::imshow("image", image);
+  // cv::imshow("image", image);
   cv::waitKey();
   cv::destroyAllWindows();
 
