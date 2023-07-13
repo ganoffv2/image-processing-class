@@ -12,7 +12,7 @@ void blkproc(cv::Mat &, std::function<void(cv::Mat &, int *)>, int * = nullptr);
 void myPSNR(cv::Mat &, cv::Mat &);
 void create_qtable(int, float, int *);
 
-void Encode_MCUs(std::vector<cv::Mat> &, bitstream &);
+void Encode_MCUs(std::vector<cv::Mat> &, bitstream &, int YCCtype);
 
 namespace blk {
 constexpr float qmatrix[3][64] = {
